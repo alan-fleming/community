@@ -5,6 +5,7 @@ Description: MBTA bus and rail departure times.
 Author: marcusb
 """
 
+load("encoding/json.star", "json")
 load("http.star", "http")
 load("render.star", "render")
 load("schema.star", "schema")
@@ -22,13 +23,13 @@ T_ABBREV = {
 }
 
 def main(config):
-    timezone = config.get("timezone") or "America/New_York"
-    stop = config.get("stop") or "place-sstat"
+    option = config.get("stop", '{"display": "South Station", "value": "place-sstat"}')
+    stop = json.decode(option)
 
     params = {
         "sort": "arrival_time",
         "include": "route",
-        "filter[stop]": stop,
+        "filter[stop]": stop["value"],
     }
     if API_KEY:
         params["api_key"] = API_KEY
@@ -45,7 +46,7 @@ def main(config):
     for prediction in predictions:
         route = prediction["relationships"]["route"]["data"]["id"]
         route = find(rep.json()["included"], lambda o: o["type"] == "route" and o["id"] == route)
-        r = renderSched(prediction, route, timezone)
+        r = renderSched(prediction, route)
         if r:
             rows.extend(r)
             rows.append(render.Box(height = 1, width = 64, color = "#ccffff"))
@@ -67,13 +68,13 @@ def main(config):
             ),
         )
 
-def renderSched(prediction, route, timezone):
+def renderSched(prediction, route):
     attrs = prediction["attributes"]
     if not attrs["departure_time"]:
         return []
     tm = attrs["arrival_time"] or attrs["departure_time"]
-    t = time.parse_time(tm).in_location(timezone)
-    arr = t - time.now().in_location(timezone)
+    t = time.parse_time(tm)
+    arr = t - time.now()
     if arr.minutes < 0:
         return []
     dest = route["attributes"]["direction_destinations"][int(attrs["direction_id"])].upper()
@@ -150,10 +151,13 @@ def find(xs, pred):
             return x
     return None
 
-def get_schema():
+def get_stops(location):
+    loc = json.decode(location)
     params = {
-        "page[limit]": "10000",
-        "sort": "name",
+        "page[limit]": "100",
+        "filter[latitude]": loc["lat"],
+        "filter[longitude]": loc["lng"],
+        "sort": "distance",
     }
     if API_KEY:
         params["api_key"] = API_KEY
@@ -168,21 +172,22 @@ def get_schema():
             continue
         if s["relationships"]["parent_station"]["data"]:
             continue
-        stops += [schema.Option(
+        stops.append(schema.Option(
             display = s["attributes"]["name"],
             value = s["id"],
-        )]
+        ))
+    return stops
 
+def get_schema():
     return schema.Schema(
         version = "1",
         fields = [
-            schema.Dropdown(
+            schema.LocationBased(
                 id = "stop",
                 name = "Stop",
                 desc = "The stop or station name.",
                 icon = "bus",
-                default = stops[0].value,
-                options = stops,
+                handler = get_stops,
             ),
         ],
     )

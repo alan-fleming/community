@@ -9,7 +9,7 @@ import (
 const (
 	// Our longest app name to date. This can be updated, but it will need to
 	// be tested in the mobile app.
-	MaxNameLength = 16
+	MaxNameLength = 17
 
 	// Our longest app summary to date. This can be updated, but it will need to
 	// be tested in the mobile app.
@@ -33,7 +33,7 @@ func ValidateName(name string) error {
 		return fmt.Errorf("name cannot be empty")
 	}
 
-	if name != strings.Title(name) {
+	if name != titleCase(name) {
 		return fmt.Errorf("'%s' should be title case, 'Fuzzy Clock' for example", name)
 	}
 
@@ -120,8 +120,8 @@ func ValidatePackageName(packageName string) error {
 	}
 
 	for _, r := range packageName {
-		if !unicode.IsLetter(r) {
-			return fmt.Errorf("package names can only contain letters or an underscore character")
+		if !(unicode.IsLetter(r) || unicode.IsNumber(r)) {
+			return fmt.Errorf("package names can only contain letters, numbers, or an underscore character")
 		}
 	}
 	return nil
@@ -145,8 +145,8 @@ func ValidateFileName(fileName string) error {
 	}
 
 	for _, r := range testName {
-		if !(unicode.IsLetter(r) || r == underscore) {
-			return fmt.Errorf("file names can only contain letters or an underscore character")
+		if !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == underscore) {
+			return fmt.Errorf("file names can only contain letters, numbers, or an underscore character")
 		}
 	}
 
@@ -161,14 +161,29 @@ func ValidateID(id string) error {
 	}
 
 	if id != strings.ToLower(id) {
-		return fmt.Errorf("ids should be lower case")
+		return fmt.Errorf("ids should be lower case, %s != %s", id, strings.ToLower(id))
 	}
 
 	for _, r := range id {
-		if !(unicode.IsLetter(r) || r == dash) {
-			return fmt.Errorf("ids can only contain letters or a dash character")
+		if !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == dash) {
+			return fmt.Errorf("ids can only contain letters, numbers, or a dash character")
 		}
 	}
 
 	return nil
+}
+
+func titleCase(input string) string {
+	words := strings.Split(input, " ")
+	smallwords := " a an on the to of "
+
+	for index, word := range words {
+		if strings.Contains(smallwords, " "+word+" ") && word != string(word[0]) {
+			words[index] = word
+		} else {
+			words[index] = strings.Title(word)
+		}
+	}
+
+	return strings.Join(words, " ")
 }
