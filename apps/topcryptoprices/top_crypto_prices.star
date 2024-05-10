@@ -10,6 +10,15 @@ Comments: Written to display the price info of top cryptocurrencies on a Tidbyt 
 Copyright: © 2022 Jeroen Houttuin, Playak - jeroen@playak.com - https://playak.com
 """
 
+load("cache.star", "cache")
+load("encoding/json.star", "json")
+load("http.star", "http")
+load("math.star", "math")
+
+# LOAD MODULES
+load("render.star", "render")
+load("schema.star", "schema")
+
 # CONFIG
 TTL = 60  # time to live for the API cache. Be nice to the free Coingecko API provider!
 PEGGEDCOINS = " USDT USDC BUSD STETH DAI FRAX WBTC USDP GUSD TUSD CUSDC USDD CUSDT USDD PAXG XAUT "  # ignore pegged tokens
@@ -18,15 +27,7 @@ DEFAULTNUMCOINS = "5"
 DEFAULTEXCLUDES = "SHIB BSV"  # SHIB because it messes up formatting and I cannot solve it. BSV for obvious reasons.
 DEFAULTCURRENCY = "USD"
 DEFAULTEXCLUDEPEGGED = True
-
-# LOAD MODULES
-load("render.star", "render")
-load("http.star", "http")
-load("encoding/base64.star", "base64")
-load("encoding/json.star", "json")
-load("cache.star", "cache")
-load("math.star", "math")
-load("schema.star", "schema")
+DEFAULTSHOWCREDITS = False
 
 # INIT
 credits = ["Data:Coingecko", "Code:Playak"]  # Credits required for using free Coingecko API
@@ -94,6 +95,8 @@ def main(config):
         if resp.status_code != 200:
             fail("API request failed with status %d", resp.status_code)
         cachedjson = json.encode(resp.json())
+
+        # TODO: Determine if this cache call can be converted to the new HTTP cache.
         cache.set(cachename, cachedjson, ttl_seconds = TTL)
     COINS = []
     counter = 0
@@ -108,13 +111,13 @@ def main(config):
         if " " + coininfo["symbol"].upper() + " " not in BLACKLIST.upper() and counter < int(config.get("numcoins", DEFAULTNUMCOINS)):
             COINS.append({"rank": int(coininfo["market_cap_rank"]), "ticker": coininfo["symbol"].upper(), "price": coininfo["current_price"], "change": coininfo["price_change_percentage_24h"]})
             counter += 1
-
     if DEBUG > 1:
         print(COINS)
     coinlines = []
     for coininfo in COINS:
         coinlines.append(renderbox(coininfo))
-    coinlines.append(renderbox(credits, color = "#444"))
+    if config.bool("showcredits", DEFAULTSHOWCREDITS):
+        coinlines.append(renderbox(credits, color = "#AEA"))
     if DEBUG > 1:
         print(coinlines)
     return render.Root(
@@ -141,7 +144,6 @@ def renderpercentage(p):
     return render.Text(str(p) + "%", color = color)
 
 def renderprice(p):
-    decimals = -1
     if p >= 1000:
         p = int(p)
     else:
@@ -199,7 +201,11 @@ def get_schema():
         ),
         schema.Option(
             display = "2 seconds",
-            value = DEFAULTDELAY,
+            value = "2000",
+        ),
+        schema.Option(
+            display = "3 seconds",
+            value = "3000",
         ),
         schema.Option(
             display = "5 seconds",
@@ -221,7 +227,7 @@ def get_schema():
         ),
         schema.Option(
             display = "5",
-            value = DEFAULTNUMCOINS,
+            value = "5",
         ),
         schema.Option(
             display = "10",
@@ -242,6 +248,10 @@ def get_schema():
             value = "AUD",
         ),
         schema.Option(
+            display = "BRL",
+            value = "BRL",
+        ),
+        schema.Option(
             display = "CAD",
             value = "CAD",
         ),
@@ -254,12 +264,32 @@ def get_schema():
             value = "CNY",
         ),
         schema.Option(
+            display = "CZK",
+            value = "CZK",
+        ),
+        schema.Option(
+            display = "DKK",
+            value = "DKK",
+        ),
+        schema.Option(
             display = "EUR",
             value = "EUR",
         ),
         schema.Option(
             display = "GBP",
             value = "GBP",
+        ),
+        schema.Option(
+            display = "HUF",
+            value = "HUF",
+        ),
+        schema.Option(
+            display = "IDR",
+            value = "IDR",
+        ),
+        schema.Option(
+            display = "ILS",
+            value = "ILS",
         ),
         schema.Option(
             display = "INR",
@@ -270,12 +300,48 @@ def get_schema():
             value = "JPY",
         ),
         schema.Option(
+            display = "KRW",
+            value = "KRW",
+        ),
+        schema.Option(
+            display = "MXN",
+            value = "MXN",
+        ),
+        schema.Option(
             display = "NOK",
             value = "NOK",
         ),
         schema.Option(
             display = "NZD",
             value = "NZD",
+        ),
+        schema.Option(
+            display = "PLN",
+            value = "PLN",
+        ),
+        schema.Option(
+            display = "RUB",
+            value = "RUB",
+        ),
+        schema.Option(
+            display = "SEK",
+            value = "SEK",
+        ),
+        schema.Option(
+            display = "SGD",
+            value = "SGD",
+        ),
+        schema.Option(
+            display = "THB",
+            value = "THB",
+        ),
+        schema.Option(
+            display = "TRY",
+            value = "TRY",
+        ),
+        schema.Option(
+            display = "TWD",
+            value = "TWD",
         ),
         schema.Option(
             display = "USD",
@@ -326,6 +392,13 @@ def get_schema():
                 desc = "Exclude stablecoins and wrapped coins.",
                 icon = "scaleBalanced",
                 default = DEFAULTEXCLUDEPEGGED,
+            ),
+            schema.Toggle(
+                id = "showcredits",
+                name = "Show Credits",
+                desc = "Show credits on last slide.",
+                icon = "copyright",
+                default = DEFAULTSHOWCREDITS,
             ),
         ],
     )
